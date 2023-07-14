@@ -2,11 +2,25 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const multer = require('multer');
+const fs = require('fs');
 const AWS = require('aws-sdk');
 const http = require('http').createServer(app);
-const upload = multer({ dest: 'uploads/' });
+
+
 app.use(express.json())
 app.use(cors())
+
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/')
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname)
+  },
+})
+
+const upload = multer({ storage: storage })
 
 
 
@@ -45,20 +59,16 @@ socketIO.on('connection', (socket) => {
 
 
 
-app.post('/register', upload.single('file'), (req, res) => {
-
-  const file = req.file;
-  const fileName = file.originalname;
+app.post('/register', upload.single('file'), (req, res) => { 
   const email = req.body.email;
   const lastname = req.body.lastname;
   const firstname = req.body.firstname;
   const status = req.body.status;
   const password = req.body.password;
-
   const params = {
     Bucket: 'user-dps',
-    Key: fileName,
-    Body: file.buffer
+    Key: req.file.originalname,
+    Body: fs.readFileSync(`uploads/${req.file.originalname}`)
   };
 
   s3.upload(params, (err, data) => {
@@ -67,6 +77,8 @@ app.post('/register', upload.single('file'), (req, res) => {
       res.status(500).send('Error uploading image to S3');
     } else {
       console.log(`Image uploaded to S3: ${data.Location}`);
+      
+      fs.unlinkSync(`uploads/${req.file.originalname}`)
       res.status(200).send('Image uploaded successfully');
     }
   });
@@ -87,7 +99,7 @@ app.post('/register', upload.single('file'), (req, res) => {
 
 app.listen(5000, () => {
   console.log("server is running on port 5000")
-  
+
 })
 
 
